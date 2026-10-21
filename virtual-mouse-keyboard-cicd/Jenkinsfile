@@ -27,24 +27,25 @@ pipeline {
         }
 
         stage('Build and Test') {
-            steps {
-                sh '''
-                    python3 --version
-                    python3 -m compileall -q app.py hand.py track.py tests
-                    python3 -m venv .ci-venv
-                    . .ci-venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pytest -v
-                '''
-            }
-            post {
-                always {
-                    sh 'rm -rf .ci-venv || true'
-                }
-            }
+    steps {
+        dir('virtual-mouse-keyboard-cicd') {
+            sh '''
+                python3 --version
+                python3 -m compileall -q app.py hand.py track.py tests
+                python3 -m venv .ci-venv
+                . .ci-venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                pytest -v
+            '''
         }
-
+    }
+    post {
+        always {
+            sh 'rm -rf virtual-mouse-keyboard-cicd/.ci-venv || true'
+        }
+    }
+}
         stage('Docker Build') {
             steps {
                 sh '''
