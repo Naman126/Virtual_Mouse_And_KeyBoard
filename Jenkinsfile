@@ -34,7 +34,7 @@ pipeline {
                     . .ci-venv/bin/activate
                     pip install --upgrade pip
                     pip install -r requirements.txt
-                    pytest -v
+                    PYTHONPATH=. pytest -v tests/
                 '''
             }
             post {
