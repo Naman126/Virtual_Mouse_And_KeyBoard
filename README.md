@@ -1,101 +1,157 @@
-# Virtual Mouse and Keyboard — CI/CD deployment (CCA-2)
+# Virtual Mouse and Keyboard Using Hand Gestures
 
-This repository packages the existing hand-gesture virtual mouse/keyboard academic project and provides a small HTTP status page so the deployment can be checked in a headless Kubernetes cluster.
+A computer vision project that allows users to control their computer's mouse and keyboard using hand gestures captured through a webcam. The project uses Python, OpenCV, and MediaPipe to detect hand landmarks and translate gestures into computer actions.
 
-> **Runtime limitation:** `hand.py` uses a physical webcam, OpenCV windows, and desktop-control libraries (`pyautogui`/`pynput`). A normal headless Minikube pod cannot control the host desktop or access its webcam automatically. The Kubernetes-deployed web page is a health/status companion for verifying the CI/CD deployment; run `python hand.py` on a desktop with a camera to use the original gesture-control interface. The original `hand.py` and `track.py` are retained in this repository.
+## Features
 
-## Repository contents
+- Virtual mouse movement using the index finger.
+- Left-click, right-click, and double-click gestures.
+- Virtual keyboard controlled by finger movements.
+- Screenshot capture using hand gestures.
+- Real-time hand tracking and visual feedback.
 
-- `hand.py`, `track.py` — original project source
-- `app.py` — small web status/health page used for Kubernetes verification
-- `tests/` — unit tests for gesture math and web health route
-- `Dockerfile` — container image for the deployable status app
-- `Jenkinsfile` — declarative CI/CD pipeline
-- `k8s/` — Kubernetes Deployment and Service manifests
+## Technologies Used
 
-## CI/CD flow
+- **Python** — Core programming language.
+- **OpenCV** — Webcam access and image processing.
+- **MediaPipe** — Real-time hand landmark detection.
+- **NumPy** — Mathematical calculations.
+- **PyAutoGUI and pynput** — Mouse and keyboard automation.
 
-1. Jenkins checks out the GitHub repository.
+## Project Structure
+
+- `hand.py`, `track.py` — Original gesture-control application.
+- `app.py` — Web status page and health endpoint for deployment verification.
+- `tests/` — Automated tests.
+- `Dockerfile` — Defines the container image.
+- `Jenkinsfile` — Defines the CI/CD pipeline.
+- `k8s/deployment.yaml` — Kubernetes Deployment configuration.
+- `k8s/service.yaml` — Kubernetes Service configuration.
+
+## Run the Original Application
+
+Create and activate a Python virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install the desktop dependencies:
+
+```bash
+python -m pip install -r requirements-desktop.txt
+```
+
+Run the gesture-control application:
+
+```bash
+python hand.py
+```
+
+A working webcam and the appropriate camera and accessibility permissions are required. The original application uses desktop GUI and input-control features.
+
+## CI/CD Deployment Using Jenkins, Docker and Kubernetes
+
+This repository also includes a CI/CD deployment demonstration for the project.
+
+### Pipeline Workflow
+
+1. Jenkins checks out the latest code from GitHub.
 2. Python syntax checks and automated tests run.
-3. Docker image is built and tagged with the Git commit and `latest`.
-4. Jenkins authenticates to Docker Hub using a Jenkins credential and pushes both tags.
-5. Jenkins applies the Kubernetes manifests to Minikube and updates the deployment image.
-6. Jenkins waits for rollout and checks pods, deployment, and service.
+3. Docker builds a container image.
+4. Jenkins pushes the image to Docker Hub using stored Jenkins credentials.
+5. Kubernetes Deployment and Service manifests are applied to Minikube.
+6. Jenkins checks deployment rollout and application health.
 
-## One-time setup
+### Prerequisites
 
-### 1. GitHub
+- A GitHub repository containing this project.
+- Jenkins with Pipeline, Git and Credentials Binding plugins.
+- Docker Engine or Docker Desktop.
+- A Docker Hub repository.
+- `kubectl` and Minikube configured for the deployment environment.
+- Python 3 and the project dependencies.
 
-Create a GitHub repository, then from this folder run:
+### Docker Hub Configuration
 
-```bash
-git init
-git add .
-git commit -m "Add virtual mouse project and CI/CD pipeline"
-git branch -M main
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPOSITORY.git
-git push -u origin main
-```
+The Docker Hub repository used for this demonstration is:
 
-### 2. Docker Hub
+`namanagarwal123/virtual-mouse-keyboard`
 
-Create a public repository named `virtual-mouse-keyboard` on Docker Hub.
+In Jenkins, create a **Username with password** credential with the ID:
 
-### 3. Jenkins credentials and job
+`dockerhub-creds`
 
-Install Jenkins plugins: **Pipeline**, **Git**, and **Credentials Binding** (Docker Pipeline is optional because this Jenkinsfile uses the Docker CLI).
+Use your Docker Hub username and a Docker Hub access token as the password. Never commit access tokens or other secrets to GitHub.
 
-Add a Jenkins credential:
-- Kind: **Username with password**
-- ID: `dockerhub-creds`
-- Username: your Docker Hub username
-- Password: a Docker Hub access token (recommended, rather than account password)
+If using a different Docker Hub account, update `DOCKERHUB_REPO` in the `Jenkinsfile` and the image reference in `k8s/deployment.yaml`.
 
-Create a **Pipeline** job, configure **Pipeline script from SCM**, select Git, enter your repository URL and branch `*/main`, and select `Jenkinsfile` as the script path.
+### Configure the Jenkins Pipeline
 
-### 4. Jenkins execution host / AWS
+1. Create a Jenkins Pipeline job.
+2. Select **Pipeline script from SCM**.
+3. Choose Git and enter your GitHub repository URL.
+4. Set the branch to `*/main`.
+5. Set the script path to `Jenkinsfile`.
+6. Ensure the Jenkins execution environment has Docker, `kubectl`, and access to the intended Kubernetes cluster.
 
-The machine/EC2 instance running Jenkins needs Git, Docker Engine, Python 3, `kubectl`, and Minikube installed. Ensure the Jenkins service account can use Docker and can access the Minikube kubeconfig/context. Start Minikube under the same account/context Jenkins uses, for example:
+**Important:** Jenkins must have a valid kubeconfig and network access to the Kubernetes API. A Minikube cluster running on a Mac is not automatically accessible to Jenkins running on an AWS EC2 instance. Configure the deployment environment before running the deployment stage.
 
-```bash
-minikube start --driver=docker
-kubectl config current-context
-kubectl get nodes
-```
+### Verify the Deployment
 
-If Minikube is started as a different Linux user, Jenkins may not see its kubeconfig; configure a dedicated Jenkins-owned kubeconfig/context instead. Configure AWS security group inbound rules narrowly: allow SSH from your IP and Jenkins web access only from trusted IPs/VPN. Do not expose Docker or Kubernetes control ports publicly.
-
-### 5. Update Jenkinsfile configuration
-
-Set `DOCKERHUB_REPO` in the Jenkinsfile to `YOUR_DOCKERHUB_USERNAME/virtual-mouse-keyboard`. Keep the credential ID as `dockerhub-creds` unless you change it in both places.
-
-### 6. Run and verify
-
-Run **Build Now** in Jenkins. On success, verify from the same Kubernetes context Jenkins uses:
+After a successful pipeline run, use the same Kubernetes context that Jenkins uses:
 
 ```bash
 kubectl get deployments
 kubectl get pods
 kubectl get services
+kubectl rollout status deployment/virtual-mouse-keyboard
+```
+
+To open the application locally when using Minikube:
+
+```bash
 minikube service virtual-mouse-keyboard --url
 ```
 
-Open the URL returned by the final command. The Service is NodePort-based; the exact URL depends on the Minikube driver/environment.
+Open the URL returned by the command. The `/health` endpoint reports the web service status.
 
-## Required second-run demonstration
+### Demonstrate a Second Deployment
 
-After the first successful pipeline run, change a visible message in `app.py`, for example the page subtitle. Commit and push the change:
+After the first successful pipeline run:
+
+1. Change a visible message in `app.py`.
+2. Commit and push the change to GitHub.
+3. Run the Jenkins pipeline again.
+4. Verify the updated image, Kubernetes rollout, and changed page.
+
+Example commands:
 
 ```bash
 git add app.py
-git commit -m "Update status page for second deployment"
-git push
+git commit -m "Update deployment status page"
+git push origin main
 ```
 
-Run the Jenkins job again. Show the new commit in Jenkins, successful image push, rollout completion, and updated page in the browser. Capture screenshots of the Jenkins stages, Docker Hub image tags, `kubectl get pods/deployments/services`, and the updated page.
+Capture screenshots of the Jenkins stages, Docker Hub image, Kubernetes resources, and updated page for the assignment report.
 
-## Notes
+## Deployment Limitation
 
-- The pipeline's test stage uses `compileall` plus `pytest`; it does not pretend that a webcam/desktop integration test ran in Kubernetes.
-- Image tags are the Git commit short SHA and `latest`.
-- Never commit Docker Hub passwords/tokens or AWS secrets into GitHub.
+The Kubernetes deployment runs the web status and health-check application; it does **not** remotely operate the host computer's webcam, mouse, or keyboard. The original interactive gesture-control application remains available through `python hand.py` on a supported desktop.
+
+## Future Improvements
+
+- Add more keyboard keys and special characters.
+- Improve gesture accuracy and reduce accidental clicks.
+- Add adjustable sensitivity and customizable gestures.
+- Support additional gestures and multi-hand interactions.
+- Develop a graphical settings interface.
+
+## Academic Project
+
+Developed as an academic project focused on computer vision, human-computer interaction, gesture-based automation, and CI/CD deployment.
+
+## License
+
+No license has been specified. Add an appropriate open-source license if you intend to permit others to reuse or modify this project.
